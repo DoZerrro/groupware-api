@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.emp.mapper.EmpMappingMapper">
+    <insert id="empMappingInsert" parameterType="com.dq.aquaranth.emp.dto.emp.EmpMappingDTO">
+        INSERT INTO tbl_emp_mapping (orga_no, emp_no, emp_rank, reg_user)
+        VALUES (#{orgaNo}, #{empNo}, #{empRank}, #{regUser})
+    </insert>
+
+
+    <select id="findByUsernameAndDeptNo" resultType="com.dq.aquaranth.emp.dto.emp.EmpMappingDTO">
+        SELECT em.emp_rank,
+               em.emp_role,
+               em.orga_no,
+               em.emp_no,
+               em.retired_date,
+               em.hired_date,
+               em.mod_user,
+               em.mod_date,
+               em.reg_user,
+               em.reg_date
+        FROM tbl_emp e
+                 JOIN tbl_emp_mapping em ON e.emp_no = em.emp_no
+                 JOIN tbl_orga o ON em.orga_no = o.orga_no
+        WHERE username = #{username}
+          AND o.upper_orga_no = (SELECT orga_no
+                                 FROM tbl_dept_mapping
+                                 WHERE dept_no = #{deptNo});
+
+    </select>
+
+    <update id="updateEmpMappingRetiredDate">
+        UPDATE tbl_emp_mapping
+        SET retired_date = DATE_FORMAT(now(), '%Y-%m-%d')
+        WHERE emp_no = #{empNo}
+    </update>
+</mapper>

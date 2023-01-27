@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.emp.mapper.EmpMapper">
+
+    <select id="findAll" resultType="com.dq.aquaranth.emp.dto.emp.EmpDTO">
+        SELECT emp_no,
+               emp_name,
+               username,
+               password,
+               gender,
+               email,
+               emp_phone,
+               emp_address,
+               first_hired_date,
+               last_retired_date,
+               emp_use,
+               uuid,
+               filename
+        FROM tbl_emp
+        WHERE emp_no > 0
+    </select>
+
+    <select id="findById" resultType="com.dq.aquaranth.emp.dto.emp.EmpDTO">
+        SELECT emp_no,
+               emp_name,
+               username,
+               password,
+               gender,
+               email,
+               emp_phone,
+               emp_address,
+               first_hired_date,
+               last_retired_date,
+               emp_use,
+               uuid,
+               filename
+        FROM tbl_emp
+        WHERE emp_no = #{empNo}
+    </select>
+
+
+    <select id="findOrgaById" resultType="com.dq.aquaranth.emp.dto.orga.EmpOrgaSelectDTO">
+        SELECT tc.company_name,
+               tc.company_tel,
+               tc.company_address,
+               tc.company_no,
+               td.dept_name,
+               tdm.dept_main,
+               tdm.dept_no,
+               tem.emp_rank,
+               tem.emp_no,
+               tem.hired_date,
+               tem.reg_date,
+               tem.retired_date,
+               tem.emp_role,
+               tor.orga_no
+        FROM tbl_emp
+                 LEFT JOIN tbl_emp_mapping tem on tbl_emp.emp_no = tem.emp_no
+                 LEFT JOIN tbl_orga tor on tor.orga_no = tem.orga_no
+                 LEFT JOIN tbl_dept_mapping tdm on tor.upper_orga_no = tdm.orga_no
+                 LEFT JOIN tbl_dept td on td.dept_no = tdm.dept_no
+                 LEFT JOIN tbl_company tc on td.company_no = tc.company_no
+        WHERE tbl_emp.emp_no = #{empNo}
+          AND td.main_flag = 1
+          AND tc.company_use = 1
+    </select>
+
+    <select id="findByUsername" resultType="com.dq.aquaranth.emp.dto.emp.EmpDTO">
+        SELECT emp_no,
+               username,
+               password,
+               uuid,
+               filename
+        FROM tbl_emp
+        WHERE username = #{username}
+          AND emp_use = 1
+    </select>
+
+    <!--    사원의 소속을 회사에서 최하위 부서까지 모두 나타내기 위한 함수-->
+    <select id="functionHierarchy" resultType="String">
+        SELECT FN_GET_HIERARCHY_ORGA(#{orgaNo}) hierarchy
+        FROM DUAL
+    </select>
+
+    <insert id="insert" parameterType="com.dq.aquaranth.emp.dto.emp.EmpDTO">
+        INSERT INTO tbl_emp (
+            emp_name, username, password, gender,
+            emp_phone, emp_address, email,
+            first_hired_date, reg_user
+        )
+        VALUES (
+            #{empName}, #{username}, #{password}, #{gender},
+            #{empPhone}, #{empAddress}, #{email},
+            #{firstHiredDate}, #{regUser}
+        )
+        <selectKey keyProperty="empNo" resultType="long" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <insert id="insertOrga" parameterType="com.dq.aquaranth.emp.dto.orga.EmpOrgaDTO">
+        INSERT INTO tbl_orga (
+            upper_orga_no, orga_type, reg_user
+        )
+        VALUES (
+            (
+                SELECT tbl_dept_mapping.orga_no
+                FROM tbl_dept_mapping
+                JOIN tbl_dept td ON td.dept_no = tbl_dept_mapping.dept_no
+                WHERE td.dept_no = #{deptNo}
+            ),
+            'emp', #{regUser}
+        )
+        <selectKey keyProperty="orgaNo" resultType="long" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <update id="update" parameterType="com.dq.aquaranth.emp.dto.emp.EmpUpdateDTO">
+        UPDATE tbl_emp
+        SET emp_name          = #{empName},
+            gender            = #{gender},
+            email             = #{email},
+            emp_phone         = #{empPhone},
+            emp_address       = #{empAddress},
+            mod_date          = now(),
+            mod_user          = #{modUser},
+            last_retired_date = #{lastRetiredDate},
+            last_login_ip     = #{lastLoginIp},
+            emp_use           = if(last_retired_date IS NOT NULL, false, true)
+        WHERE emp_no = #{empNo}
+    </update>
+
+    <update id="updateOrga">
+        UPDATE tbl_emp_mapping e
+            JOIN tbl_orga t ON t.orga_no = e.orga_no
+        SET e.emp_rank      = #{empRank},
+            e.emp_role      = #{empRole},
+            e.retired_date  = #{retiredDate},
+            e.mod_date      = now(),
+            e.mod_user      = #{modUser},
+            t.mod_date      = now(),
+            t.mod_user      = #{modUser},
+            t.upper_orga_no = (SELECT tbl_dept_mapping.orga_no
+                               FROM tbl_dept_mapping
+                               WHERE tbl_dept_mapping.dept_no = #{deptNo})
+        WHERE e.orga_no = #{orgaNo}
+    </update>
+
+    <update id="updateRecentAccessInfo">
+        UPDATE tbl_emp
+        SET last_login_time = #{lastLoginTime},
+            last_login_ip   = #{lastLoginIp}
+        WHERE emp_no = #{empNo}
+    </update>
+
+
+    <update id="updateProfile">
+        UPDATE tbl_emp
+        SET uuid     = #{uuid},
+            filename = #{filename}
+        WHERE emp_no = #{empNo}
+    </update>
+
+    <select id="findLoginUser" resultMap="empMap">
+        SELECT te.emp_name,
+               te.emp_no,
+               te.username,
+               te.last_login_time,
+               te.last_login_ip,
+               tem.emp_rank,
+               tem.orga_no,
+               tc.company_name,
+               td.dept_name,
+               td.dept_no,
+               tc.company_no
+        FROM tbl_emp te
+                 LEFT JOIN tbl_emp_mapping tem on te.emp_no = tem.emp_no
+                 LEFT JOIN tbl_orga tor on tor.orga_no = tem.orga_no
+                 LEFT JOIN tbl_dept_mapping tdm on tor.upper_orga_no = tdm.orga_no
+                 LEFT JOIN tbl_dept td on td.dept_no = tdm.dept_no
+                 LEFT JOIN tbl_company tc on td.company_no = tc.company_no
+        WHERE username = #{username}
+    </select>
+
+
+    <resultMap id="empMap" type="com.dq.aquaranth.emp.dto.login.EmpLoginEmpDTO">
+        <id property="empNo" column="emp_no"/>
+        <result property="empName" column="emp_name"/>
+        <result property="lastLoginTime" column="last_login_time"/>
+        <result property="lastLoginIp" column="last_login_ip"/>
+        <result property="username" column="username"/>
+        <collection property="companyList" resultMap="companyMap"/>
+    </resultMap>
+
+    <resultMap id="companyMap" type="com.dq.aquaranth.emp.dto.login.EmpLoginCompanyDTO">
+        <id property="companyName" column="company_name"/>
+        <result property="companyNo" column="company_no"/>
+        <collection property="deptList" resultMap="departmentMap"/>
+    </resultMap>
+
+    <resultMap id="departmentMap" type="com.dq.aquaranth.emp.dto.login.EmpLoginDepartmentDTO">
+        <result property="deptNo" column="dept_no"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="empRank" column="emp_rank"/>
+        <result property="orgaNo" column="orga_no"/>
+    </resultMap>
+
+</mapper>

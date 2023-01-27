@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.mygroup.mapper.OrgatreeMapper">
+
+    <!--########################################### 조직도 Page ###########################################-->
+
+    <!--Read-->
+    <!--조직도 트리 출력-->
+    <select id="findAllOrga" resultType="com.dq.aquaranth.mygroup.dto.orgatree.OrgaTreeDTO">
+        <if test="depth eq 0">
+            select 0 dept_no,
+            null upper_dept_no,
+            company_name dept_name,
+            0 ord,
+            0 depth,
+            null last_dno,
+            company_no,
+            orga_no
+            from tbl_company
+            where company_no = #{companyNo} and company_use = true
+            union all
+        </if>
+        select d.dept_no, d.upper_dept_no, d.dept_name, d.ord, d.depth, d.last_dno, d.company_no, dm.orga_no
+        from tbl_dept d
+        join tbl_dept_mapping dm on d.dept_no = dm.dept_no
+        where (upper_dept_no = #{upperDeptNo} OR upper_dept_no is null )and depth = #{depth}
+        and company_no = #{companyNo} and main_flag = true
+    </select>
+
+
+    <!--해당 부서에 속한 사원 정보 모두 조회-->
+    <select id="findAllEmpInformation" resultType="com.dq.aquaranth.mygroup.dto.orgatree.OrgaTreeEmpListDTO">
+        select e.emp_no
+             , o.orga_no
+             , e.emp_name
+             , em.emp_rank
+             , e.username
+             , FN_GET_HIERARCHY_ORGA(#{orgaNo}) as path
+             , e.emp_phone
+        from tbl_emp e
+                 join tbl_emp_mapping em on e.emp_no = em.emp_no
+                 join tbl_orga o on o.orga_no=em.orga_no
+        where o.upper_orga_no=#{orgaNo}
+          and (em.retired_date is null
+            or DATEDIFF(em.retired_date, (select curdate())) >= 0
+            )
+          and e.emp_use = true
+    </select>
+
+
+    <!--해당 부서에 소속된 사원 중 한 사원의 정보 조회-->
+    <select id="findByEmpNo" resultType="com.dq.aquaranth.mygroup.dto.orgatree.OrgatreeEmpInformationDTO">
+        select em.orga_no
+             , e.emp_name
+             , e.username
+             , em.emp_rank
+             , FN_GET_HIERARCHY_ORGA(#{orgaNo}) as path
+             , e.emp_phone
+             , e.email
+             , e.filename
+             , e.uuid
+        from tbl_emp e
+                 join tbl_emp_mapping em on e.emp_no = em.emp_no
+        where em.orga_no=#{orgaNo}
+          and (em.retired_date is null
+            or DATEDIFF(em.retired_date, (select curdate())) >= 0
+            )
+          and e.emp_use = true
+    </select>
+</mapper>

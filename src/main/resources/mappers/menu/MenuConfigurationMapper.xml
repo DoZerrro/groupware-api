@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.menu.mapper.MenuConfigurationMapper">
+
+    <sql id="find_all">
+        <where>
+            <if test="menuCode != null">
+                OR menu_code = #{menuCode}
+            </if>
+            <if test="menuNo != null">
+                OR menu_no = #{menuNo}
+            </if>
+            <if test="keyword eq 'gnb'">
+                OR upper_menu_no IS NULL
+            </if>
+            <if test="keyword eq 'lnb'">
+                OR MATCH (menu_path) AGAINST ( '%/'#{menuCode}'/%' )
+            </if>
+            <if test="true">
+                AND delete_flag = FALSE
+            </if>
+        </where>
+    </sql>
+
+    <sql id="find_one">
+        <where>
+            <if test="menuCode != null">
+                AND menu_code = #{menuCode}
+            </if>
+            <if test="menuNo != null">
+                AND menu_no = #{menuNo}
+            </if>
+            <if test="true">
+                AND delete_flag = FALSE
+            </if>
+        </where>
+    </sql>
+
+    <select id="findBy" resultType="com.dq.aquaranth.menu.dto.response.MenuResponseDTO">
+        SELECT m.menu_no,
+               m.upper_menu_no,
+               m.menu_name,
+               m.main_flag,
+               m.delete_flag,
+               m.menu_code,
+               m.menu_path, menu_order,
+               m.menu_default,
+               m.depth,
+               m.uuid,
+               m.filename
+        FROM tbl_menu m
+        <include refid="find_one"/>
+    </select>
+
+    <select id="findAllBy" resultType="com.dq.aquaranth.menu.dto.response.MenuResponseDTO">
+        SELECT m.menu_no,
+        m.upper_menu_no,
+        m.menu_name,
+        m.main_flag,
+        m.delete_flag,
+        m.menu_code,
+        m.menu_path, menu_order,
+        m.menu_default,
+        m.depth,
+        m.uuid,
+        m.filename
+        FROM tbl_menu m
+        <include refid="find_all"/>
+        order by m.menu_order, m.menu_no
+    </select>
+
+    <select id="findMenuDetailsBy" resultType="com.dq.aquaranth.menu.dto.response.MenuDetailResponseDTO">
+        select m.upper_menu_no,
+        um.menu_name as upper_menu_name,
+        m.menu_no,
+        m.menu_name,
+        m.menu_code,
+        m.main_flag,
+        m.menu_order,
+        m.uuid,
+        m.filename
+        from tbl_menu m
+        left join tbl_menu um on um.menu_no = m.upper_menu_no
+        <if test="menuCode != null">
+            WHERE m.menu_code = #{menuCode} AND m.delete_flag = FALSE
+        </if>
+        <if test="menuNo != null">
+            WHERE m.menu_no = #{menuNo} AND m.delete_flag = FALSE
+        </if>
+        order by m.menu_order, m.menu_no
+    </select>
+
+    <select id="findUnderMenusBy" resultType="com.dq.aquaranth.menu.dto.response.MenuTreeResponseDTO">
+        SELECT m.menu_no,
+        m.depth,
+        m.upper_menu_no,
+        m.menu_name,
+        m.menu_code,
+        m.menu_path,
+        m.uuid,
+        m.filename,
+        (SELECT COUNT(*)
+        from tbl_menu
+        WHERE upper_menu_no = m.menu_no) sub_menu_count
+        from tbl_menu m
+        <if test="keyword eq 'gnb'">
+            where m.upper_menu_no IS NULL AND m.delete_flag = FALSE
+        </if>
+        <if test="menuNo != null">
+            where m.upper_menu_no = #{menuNo} AND m.delete_flag = FALSE
+        </if>
+        order by m.menu_order, m.menu_no
+    </select>
+
+    <insert id="insert">
+        insert into tbl_menu (upper_menu_no, menu_name, main_flag, menu_code, menu_path, menu_order,depth, uuid, filename, reg_user, reg_date)
+        VALUES (#{upperMenuNo},
+        #{menuName},
+        #{mainFlag},
+        #{menuCode},
+        #{menuPath},
+        #{menuOrder},
+        #{depth},
+        #{uuid},
+        #{filename},
+        #{regUser},
+        NOW())
+    </insert>
+
+    <update id="updateIcon">
+        UPDATE tbl_menu
+        SET uuid = #{uuid},
+        filename = #{filename},
+        mod_user = #{modUser},
+        mod_date = NOW()
+        <include refid="find_one"/>
+    </update>
+
+    <delete id="delete">
+        DELETE
+        FROM tbl_menu
+        <include refid="find_one"/>
+    </delete>
+
+    <update id="update">
+        UPDATE tbl_menu
+        SET menu_name = #{menuName},
+        menu_order = #{menuOrder},
+        main_flag = #{mainFlag},
+        mod_user = #{modUser},
+        mod_date = NOW()
+        <include refid="find_one"/>
+    </update>
+
+</mapper>

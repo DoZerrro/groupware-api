@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.menu.mapper.MenuMapper">
+
+    <select id="findAllBy" resultType="com.dq.aquaranth.menu.dto.response.MenuTreeResponseDTO">
+        select distinct
+        mr.menu_no,
+        mr.upper_menu_no,
+        mr.menu_name,
+        mr.main_flag,
+        mr.menu_code,
+        mr.menu_path,
+        mr.menu_order,
+        mr.menu_default,
+        mr.depth,
+        mr.uuid,
+        mr.filename,
+        (SELECT COUNT(*)
+            from tbl_menu
+            WHERE upper_menu_no = m.menu_no) sub_menu_count
+        from tbl_menu m
+            join (select tm.*
+                    from tbl_menu tm
+                    join (
+                        select tmr.role_group_no, tm.menu_no
+                            from tbl_menu_role tmr
+                            join tbl_menu tm on tmr.menu_no = tm.menu_no
+                            where tmr.role_group_no in
+            <foreach collection="rolegroup" item="item" index="index" separator="," open="(" close=")">
+                #{item}
+            </foreach>
+                        group by tmr.role_group_no, tm.menu_no)
+                rg on rg.menu_no = tm.menu_no
+                where tm.main_flag = true)
+        mr on mr.menu_no = m.menu_no
+        <if test="menu.keyword eq 'gnb'">
+            where m.upper_menu_no IS NULL AND m.delete_flag = false
+        </if>
+        <if test="menu.menuNo != null">
+            where m.upper_menu_no = #{menu.menuNo} AND m.delete_flag = false
+        </if>
+        order by mr.menu_order, mr.menu_no
+    </select>
+
+    <select id="initRoutes" resultType="com.dq.aquaranth.menu.dto.response.MenuImportResponseDTO">
+        SELECT menu_path, menu_no, menu_name
+        FROM tbl_menu;
+    </select>
+</mapper>

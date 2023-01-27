@@ -1,0 +1,5 @@
+### 로그인한 사원의 현재 레디스 부서정보, 회사정보, 사원정보
+GET /api/login/userinfo HTTP/1.1
+Host: localhost:8080
+Content-Type: application/json
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTY3MDc4Njc4Mn0.GJ73Sh1ZWaDIZnTmkiTcOFV8jdpSZ2cT62S58VbYKXI

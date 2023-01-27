@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.userrole.mapper.TreeMapper">
+    <select id="getFromCompany">
+        select 0 dept_no,
+               null upper_dept_no,
+               company_name dept_name,
+               0 ord,
+               0 depth,
+               null last_dno
+        from tbl_company
+        where company_no = ${upperDeptNo}
+    </select>
+
+    <select id="getFromParent" resultType="com.dq.aquaranth.userrole.dto.tree.TreeDTO">
+        <if test="depth eq 0">
+            select 0 dept_no,
+            null upper_dept_no,
+            tc.company_name dept_name,
+            0 ord,
+            0 depth,
+            null last_dno,
+            tc.company_no,
+            (select count(*)
+             from tbl_dept td
+             where td.company_no = tc.company_no
+             and td.depth = 1) lower_dept_cnt,
+             tc.orga_no
+             from tbl_company tc
+             where tc.company_no = (select company_no from tbl_company where orga_no = #{companyNo})
+            union all
+        </if>
+        select td.dept_no, td.upper_dept_no, td.dept_name, td.ord, td.depth, td.last_dno, td.company_no
+        , (select count(*)
+           from tbl_dept
+           where company_no = td.company_no
+           and upper_dept_no = td.dept_no
+           group by upper_dept_no
+        ) lower_dept_cnt
+        , (select tdm.orga_no
+           from tbl_dept_mapping tdm
+           join tbl_orga t on tdm.orga_no = t.orga_no
+           where tdm.dept_no = td.dept_no
+        ) orga_no
+        from tbl_dept td
+        where (td.upper_dept_no = #{upperDeptNo} OR
+               td.upper_dept_no is null )
+        and td.depth = #{depth}
+        <if test="depth > 1">
+            and td.company_no = (select company_no
+                                 from tbl_dept dd
+                                 join tbl_dept_mapping mm on dd.dept_no = mm.dept_no
+                                 where mm.orga_no = #{companyNo})
+        </if>
+        <if test="2 > depth">
+            and td.company_no = (select company_no from tbl_company where orga_no = #{companyNo})
+        </if>
+        and td.main_flag = true
+    </select>
+
+    <select id="findOrgaList" resultType="com.dq.aquaranth.userrole.dto.tree.TreeOrgaListDTO">
+        select *
+        from (
+        <if test="recursive">
+            with recursive cte as(
+                select x.orga_no, x.upper_orga_no, x.orga_type, x.main_flag
+                from (
+                      select t.orga_no, t.upper_orga_no, t.orga_type,
+                             case when t.orga_type = 'company' then (select tc.company_use from tbl_company tc where tc.orga_no = t.orga_no)
+                                  when t.orga_type = 'dept' then (select td.main_flag from tbl_dept td join tbl_dept_mapping tdm on td.dept_no = tdm.dept_no where tdm.orga_no = t.orga_no)
+                                  when t.orga_type = 'emp' then (select te.emp_use from tbl_emp te join tbl_emp_mapping tem on te.emp_no = tem.emp_no where tem.orga_no = t.orga_no)
+                                  else false end main_flag
+                      from tbl_orga t
+                      where t.orga_no = #{orgaNo}
+                ) x
+                where x.main_flag = true
+                union all
+                select x.orga_no, x.upper_orga_no, x.orga_type, x.main_flag
+                from (
+                      select t.orga_no, t.upper_orga_no, t.orga_type,
+                             case when t.orga_type = 'company' then (select tc.company_use from tbl_company tc where tc.orga_no = t.orga_no)
+                                  when t.orga_type = 'dept' then (select td.main_flag from tbl_dept td join tbl_dept_mapping tdm on td.dept_no = tdm.dept_no where tdm.orga_no = t.orga_no)
+                                  when t.orga_type = 'emp' then (select te.emp_use from tbl_emp te join tbl_emp_mapping tem on te.emp_no = tem.emp_no where tem.orga_no = t.orga_no)
+                                  else false end main_flag
+                      from cte c
+                      join tbl_orga t on t.upper_orga_no = c.orga_no
+                ) x
+                where x.main_flag = true
+            )
+        </if>
+        <if test="!recursive">
+            with cte as (
+                select x.orga_no, x.upper_orga_no, x.orga_type, x.main_flag
+                from (
+                      select t.orga_no, t.upper_orga_no, t.orga_type,
+                             case when t.orga_type = 'company' then (select tc.company_use from tbl_company tc where tc.orga_no = t.orga_no)
+                                  when t.orga_type = 'dept' then (select td.main_flag from tbl_dept td join tbl_dept_mapping tdm on td.dept_no = tdm.dept_no where tdm.orga_no = t.orga_no)
+                                  when t.orga_type = 'emp' then (select te.emp_use from tbl_emp te join tbl_emp_mapping tem on te.emp_no = tem.emp_no where tem.orga_no = t.orga_no)
+                                  else false end main_flag
+                      from tbl_orga t
+                      where t.orga_no = #{orgaNo}
+                      or upper_orga_no = #{orgaNo}
+                ) x
+                where x.main_flag = true
+            )
+        </if>
+        select case when cte.orga_type = 'company' then (select tc.company_name from tbl_company tc where tc.orga_no = cte.orga_no)
+                    when cte.orga_type = 'dept' then (select tc.company_name from tbl_company tc join tbl_dept t on tc.company_no = t.company_no join tbl_dept_mapping m on t.dept_no = m.dept_no where m.orga_no = cte.orga_no)
+                    else (select tc.company_name from tbl_company tc join tbl_dept t on tc.company_no = t.company_no join tbl_dept_mapping m on t.dept_no = m.dept_no where m.orga_no = cte.upper_orga_no)
+                    end company_name
+             , case when cte.orga_type = 'emp' then (select dept_name from tbl_dept td join tbl_dept_mapping tdm on tdm.dept_no = td.dept_no where tdm.orga_no = cte.upper_orga_no)
+                    else (select dept_name from tbl_dept td join tbl_dept_mapping tdm on tdm.dept_no = td.dept_no where tdm.orga_no = cte.orga_no)
+                    end dept_name
+             , tem.emp_rank
+             , te.username
+             , te.emp_name
+             , cte.orga_no
+             , cte.upper_orga_no
+             , cte.orga_type
+        from cte
+        left join tbl_emp_mapping tem on tem.orga_no = cte.orga_no
+        left join tbl_emp te on tem.emp_no = te.emp_no
+        ) x
+        where x.company_name is not null
+        <if test="option == 'emp' and keyword != '' and keyword != null">
+            and (
+            emp_name like concat('%', #{keyword}, '%') OR
+            username like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="option == 'dept' and keyword != '' and keyword != null">
+            and dept_name like concat('%', #{keyword}, '%')
+        </if>
+    </select>
+</mapper>
+
+

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.rolegroup.mapper.RoleGroupMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="roleGroupNo" parameterType="com.dq.aquaranth.rolegroup.domain.RoleGroup">
+        insert into tbl_role_group (role_group_name, role_group_use, company_no, reg_user)
+        VALUES (#{roleGroupName}, #{roleGroupUse}, #{companyNo}, #{regUser})
+    </insert>
+
+    <update id="update" parameterType="com.dq.aquaranth.rolegroup.dto.RoleGroupUpdateDTO">
+        update tbl_role_group
+        set role_group_name = #{roleGroupName},
+            role_group_use  = #{roleGroupUse},
+            company_no      = #{companyNo},
+            mod_user        = #{modUser},
+            mod_date        = now()
+        where role_group_no = #{roleGroupNo}
+    </update>
+
+    <update id="hideById">
+        update tbl_role_group
+        set role_group_use = false
+        where role_group_no = #{roleGroupNo}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        delete
+        from tbl_role_group
+        where role_group_no = #{roleGroupNo}
+    </delete>
+
+    <select id="findAll" resultType="com.dq.aquaranth.rolegroup.dto.RoleGroupResponseDTO">
+        select roleGroup.*, company.company_name
+        from tbl_role_group roleGroup
+                 join tbl_company company on roleGroup.company_no = company.company_no
+    </select>
+
+    <select id="findById" resultType="com.dq.aquaranth.rolegroup.domain.RoleGroup" parameterType="long">
+        select *
+        from tbl_role_group
+        where role_group_no = #{roleGroupNo}
+    </select>
+
+    <select id="findRoleGroupsByLoginUser" resultType="com.dq.aquaranth.rolegroup.domain.RoleGroup">
+        select trg.*
+        from (
+                 with recursive cte as (
+                     select o.*
+                     from tbl_orga o
+                              join tbl_dept_mapping tdm on o.orga_no = tdm.orga_no
+                     where tdm.dept_no = #{loginDeptNo}
+                     union all
+                     select t.*
+                     from cte c
+                              join tbl_orga t on t.orga_no = c.upper_orga_no
+                 )
+                 select orga_no
+                 from tbl_company
+                 where company_no = #{loginCompanyNo}
+                 union
+                 select orga_no
+                 from cte
+                 union
+                 select to2.orga_no
+                 from tbl_emp te
+                          join tbl_emp_mapping tem on te.emp_no = tem.emp_no
+                          join tbl_orga to2 on tem.orga_no = to2.orga_no
+                          join tbl_dept_mapping m on to2.upper_orga_no = m.orga_no
+                 where te.username = #{username}
+                   and m.dept_no = #{loginDeptNo}
+             ) orga
+                 join tbl_orga_role tor on tor.orga_no = orga.orga_no
+                 join tbl_role_group trg on tor.role_group_no = trg.role_group_no
+    </select>
+    <select id="findByMenuCode" resultType="com.dq.aquaranth.rolegroup.domain.RoleGroup">
+        select roleGroup.*
+        from tbl_menu_role menuRole
+                 join tbl_menu menu
+                      on menu.menu_no = menuRole.menu_no
+                 join tbl_role_group roleGroup on menuRole.role_group_no = roleGroup.role_group_no
+        where menu_code = #{menuCode}
+    </select>
+    <select id="getList" resultType="com.dq.aquaranth.rolegroup.dto.RoleGroupResponseDTO">
+        select sql_calc_found_rows roleGroup.*, company.company_name
+        from tbl_role_group roleGroup
+                 join tbl_company company on roleGroup.company_no = company.company_no
+        where company.company_use = true
+        <if test="companyNo != null and companyNo != ''">
+            and company.company_no = #{companyNo}
+        </if>
+        <if test="roleGroupName != null and roleGroupName != ''">
+            and roleGroup.role_group_name like concat('%', #{roleGroupName}, '%')
+        </if>
+        limit #{skip}, #{size}
+    </select>
+<!--    found_rows() : total count 를 구할때, 한번의 쿼리만으로 처리가능. count를 사용하면 쿼리를 두번날려야 해서 부하를 유발한다.-->
+<!--    select_calc_found_rows 를 쓰고 found_rows() 를 쓰면 앞전에 select 한 전체 갯수를 found_rows() 를 쓴 쿼리에서 반환한다. -->
+<!--    앞전에 쓴 쿼리에 limit 가 있는경우, limit 부분은 무시하고 select 된 전체 갯수를 반환한다.-->
+    <select id="getTotal" resultType="java.lang.Integer">
+        select found_rows()
+    </select>
+</mapper>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.rolegroup.mapper.MenuRoleMapper">
+
+    <insert id="insert" parameterType="com.dq.aquaranth.rolegroup.domain.MenuRole">
+        insert into tbl_menu_role (role_group_no, menu_no, reg_user, reg_date, mod_user, mod_date)
+        VALUES (#{roleGroupNo}, #{menuNo}, #{regUser}, #{regDate}, #{modUser}, #{modDate})
+    </insert>
+    <delete id="deleteAllByRoleGroupNo" parameterType="long">
+        delete
+        from tbl_menu_role
+        where role_group_no = #{roleGroupNo}
+    </delete>
+
+    <delete id="deleteByRoleGroupNoAndModuleCode">
+        delete
+        from tbl_menu_role
+        where role_group_no = #{roleGroupNo}
+          and menu_no in (with recursive menuAll as (select m1.menu_name, m1.menu_no, m1.upper_menu_no
+                                                     from tbl_menu m1
+                                                     where m1.menu_code = #{moduleCode}
+                                                     union all
+                                                     select m3.menu_name, m3.menu_no, m3.upper_menu_no
+                                                     from menuAll m2
+                                                              join tbl_menu m3 on m3.upper_menu_no = m2.menu_no)
+                          select ma.menu_no
+                          from menuAll ma)
+    </delete>
+
+    <select id="findAllByRoleGroupNo" resultType="com.dq.aquaranth.rolegroup.domain.MenuRole" parameterType="long">
+        select *
+        from tbl_menu_role
+        where role_group_no = #{roleGroupNo}
+    </select>
+    <select id="findByRoleGroupNoAndModuleCode" resultType="com.dq.aquaranth.rolegroup.dto.MenuRoleLnbDTO">
+        select temp1.menu_no as menu_no,
+               menu_name,
+               depth,
+               upper_menu_no,
+               menu_path,
+               IF(temp1.menu_no = temp2.menu_no, true, false) checked
+        from (with recursive menuAll as (select m1.menu_name, m1.menu_no, m1.upper_menu_no, m1.depth, m1.menu_path
+                                         from tbl_menu m1
+                                         where m1.menu_code = #{moduleCode}
+
+                                         union all
+
+                                         select m3.menu_name, m3.menu_no, m3.upper_menu_no, m3.depth, m3.menu_path
+                                         from menuAll m2
+                                                  join tbl_menu m3 on m3.upper_menu_no = m2.menu_no)
+              select ma.menu_no, ma.menu_name, ma.upper_menu_no, ma.depth, ma.menu_path
+              from menuAll ma) temp1
+                 left outer join
+             (select menu_no
+              from tbl_menu_role
+              where role_group_no = #{roleGroupNo}) temp2
+              on temp1.menu_no = temp2.menu_no
+              order by menu_path
+    </select>
+</mapper>

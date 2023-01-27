@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.mygroup.mapper.FavoriteeMapper">
+
+    <!--########################################## 즐겨찾기 Page ##########################################-->
+
+    <!--Create-->
+    <!--해당 마이그룹에 사원 즐겨찾기-->
+    <insert id="insert">
+        insert into tbl_favorite (mygroup_no, favorite_emp_no, reg_user)
+        values (#{mygroupNo}, #{orgaNo}, #{regUser})
+    </insert>
+
+
+    <!--Read-->
+    <!--해당 마이그룹에 즐겨찾기 된 모든 사원 정보 출력-->
+    <select id="findAll" resultType="com.dq.aquaranth.mygroup.dto.favorite.FavoriteEmpListDTO">
+        select fa.favorite_emp_no as orga_no
+             , e.emp_no
+             , e.emp_name
+             , em.emp_rank
+             , e.username
+             , FN_GET_HIERARCHY_ORGA(fa.favorite_emp_no) as path
+             , e.emp_phone
+             , fa.mygroup_no
+        from tbl_favorite fa
+                 join tbl_mygroup my on fa.mygroup_no = my.mygroup_no
+                 join tbl_orga o on fa.favorite_emp_no = o.orga_no
+                 join tbl_emp_mapping em on o.orga_no = em.orga_no
+                 join tbl_emp e on em.emp_no = e.emp_no
+        where fa.mygroup_no=${mygroupNo}
+          and (em.retired_date is null
+            or DATEDIFF(em.retired_date, (select curdate())) >= 0
+            )
+          and e.emp_use = true
+    </select>
+
+
+    <!--Delete-->
+    <!--해당 마이그룹에서 즐겨찾기 된 사원 삭제-->
+    <delete id="delete">
+        delete from tbl_favorite
+        where mygroup_no=#{mygroupNo} and favorite_emp_no=#{orgaNo}
+    </delete>
+</mapper>

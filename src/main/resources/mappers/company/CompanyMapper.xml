@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dq.aquaranth.company.mapper.CompanyMapper">
+
+    <!--######################################## 회사 기본정보 Page ########################################-->
+
+    <!--Read-->
+    <!--회사 일부정보(회사번호, 회사명, 대표자명, 사용여부만)가 포함된 전체 리스트 출력-->
+    <select id="findAllCompany" resultType="com.dq.aquaranth.company.dto.CompanyListDTO">
+        select company_no, company_name, owner_name, company_use
+        from tbl_company
+    </select>
+
+    <!--해당 회사에 대한 기본정보 출력-->
+    <select id="findByCompanyNo" resultType="com.dq.aquaranth.company.dto.CompanyInformationDTO">
+        select company_no, orga_no, company_name, company_address, company_tel
+             , owner_name, founding_date, business_number, company_use
+        from tbl_company
+        where company_no = #{companyNo}
+    </select>
+
+
+    <!--Create-->
+    <!--상위 조직번호가 없고 'company' 타입인 조직 추가-->
+    <insert id="insertOrga">
+        insert into tbl_orga (upper_orga_no, orga_type, reg_user)
+        values (#{upperOrgaNo}, #{orgaType}, #{regUser})
+        <selectKey keyProperty="orgaNo" resultType="long" order="AFTER">
+            select LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <!--회사 기본정보 추가-->
+    <insert id="insert">
+        insert into tbl_company (
+                                    orga_no, company_name, company_address, company_tel,
+                                    owner_name, founding_date, business_number, company_use,
+                                    reg_user
+                                 )
+        values (
+                #{orgaNo}, #{companyName}, #{companyAddress}, #{companyTel},
+                #{ownerName}, #{foundingDate}, #{businessNumber}, #{companyUse}, #{regUser}
+                )
+        <selectKey keyProperty="companyNo" resultType="long" order="AFTER">
+            select LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <!--상위 조직번호는 등록한 회사의 조직번호, 'dept' 타입인 조직 추가-->
+    <!--insertOrga mapper 사용-->
+
+    <!--부서 기본정보 추가(대표이사 부서 추가)-->
+    <insert id="insertDept">
+        insert into tbl_dept (company_no, dept_name, dept_desc, depth, reg_user)
+        values (#{companyNo}, #{deptName}, #{deptDesc}, #{depth}, #{regUser})
+        <selectKey keyProperty="deptNo" resultType="long" order="AFTER">
+            select LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <!--부서 매핑 추가-->
+    <insert id="insertDeptMapping">
+        insert into tbl_dept_mapping (dept_no, orga_no, reg_user)
+        values (#{deptNo}, #{orgaNo}, #{regUser})
+    </insert>
+
+
+    <!--Update-->
+    <!--회사 기본정보 수정-->
+    <update id="update">
+        update tbl_company
+        set company_name=#{companyName}, company_address=#{companyAddress}, company_tel=#{companyTel}
+          , owner_name=#{ownerName}, company_use=#{companyUse}, mod_user=#{modUser}
+          , mod_date = now()
+        where company_no = #{companyNo}
+    </update>
+
+
+    <!--Delete-->
+    <!--회사 기본정보 삭제(즉, 사용 여부가 '사용'인 회사를 '미사용'으로 변경)-->
+    <delete id="deleteByCompanyNo">
+        update tbl_company
+        set company_use = false
+        where company_no = ${companyNo} and company_use = true
+    </delete>
+
+
+    <!--Search-->
+    <!--회사코드, 회사명, 사용여부로 회사 기본정보 검색-->
+    <select id="search" resultType="com.dq.aquaranth.company.dto.CompanyListDTO">
+        select company_no, company_name, owner_name, company_use
+        from tbl_company
+        <where>
+            <if test="companyUse == 'true'">
+                company_use=1
+            </if>
+            <if test="companyUse == 'false'">
+                company_use=0
+            </if>
+            <if test="companySearch != null or companySearch != ''">
+                and (company_no like concat('%', #{companySearch}, '%')
+                or company_name like concat('%', #{companySearch}, '%'))
+            </if>
+        </where>
+    </select>
+
+
+    <!--sort-->
+    <!--회사코드, 회사명, 대표자명, 사용여부로 정렬 후 회사 일부정보 리스트 출력-->
+    <select id="sort" resultType="com.dq.aquaranth.company.dto.CompanyListDTO">
+        select company_no, company_name, owner_name, company_use
+        from tbl_company
+        order by
+            <choose>
+                <when test="sortValue == 'companyNo'">
+                    company_no
+                </when>
+                <when test="sortValue == 'companyName'">
+                    company_name
+                </when>
+                <when test="sortValue == 'ownerName'">
+                    owner_name
+                </when>
+                <when test="sortValue == 'companyUse'">
+                    company_use
+                </when>
+            </choose>
+    </select>
+
+
+    <!--사용자 아이디에 맞는 회사 정보 출력-->
+    <select id="findByUsername" resultType="com.dq.aquaranth.company.dto.CompanyInformationDTO">
+        select c.*
+        from (with recursive findDept as (select to1.orga_no, to1.upper_orga_no, to1.orga_type
+                                          from tbl_orga to1
+                                                   join tbl_emp_mapping tem on to1.orga_no = tem.orga_no
+                                                   join tbl_emp te on te.emp_no = tem.emp_no
+                                                   join tbl_dept_mapping m on to1.upper_orga_no = m.orga_no
+                                          where te.username = #{username}
+                                            and m.dept_main = true
+                                          union all
+                                          select to2.orga_no, to2.upper_orga_no, to2.orga_type
+                                          from tbl_orga to2
+                                                   join findDept fd on fd.upper_orga_no = to2.orga_no)
+              select f.orga_no, f.orga_type
+              from findDept f) x
+                 join tbl_company c on c.company_no = x.orga_no
+    </select>
+</mapper>
